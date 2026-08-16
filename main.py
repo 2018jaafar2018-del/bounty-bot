@@ -33,7 +33,8 @@ async def on_message(message):
           img_bytes = await item.read()
           img_b64 = base64.b64encode(img_bytes).decode("utf-8")
 
-          url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_GEMINI}"
+          # تم تعديل اسم النموذج هنا ليكون مدعوماً وصحيحاً
+          url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_GEMINI}"
 
           headers = {"Content-Type": "application/json"}
           payload = {
