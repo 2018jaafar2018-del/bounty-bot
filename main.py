@@ -1,89 +1,94 @@
-import base64
 import os
 import discord
 import requests
 
-# سحب التوكن والمفتاح بأمان من متغيرات البيئة في Railway
-TOKEN_DISCORD = os.getenv("DISCORD_TOKEN")
+# قراءة التوكن والمفتاح من متغيرات البيئة في Railway
+TOKEN = os.getenv("DISCORD_TOKEN")
 API_KEY_GEMINI = os.getenv("GEMINI_API_KEY")
 
-my_intents = discord.Intents.default()
-my_intents.message_content = True
-bot_client = discord.Client(intents=my_intents)
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
 
 
-@bot_client.event
+@client.event
 async def on_ready():
-  print(f"البوت جاهز ومتحمس لتحليل إحصائياتك: {bot_client.user}")
+  print(f"البوت جاهز ومتحمس لتحليل إحصائياتك: {client.user}")
 
 
-@bot_client.event
+@client.event
 async def on_message(message):
-  if message.author == bot_client.user:
+  # تجاهل رسائل البوت نفسه
+  if message.author == client.user:
     return
 
+  # التأكد من وجود صورة مرفقة مع الرسالة
   if message.attachments:
-    print("تم استلام الصورة، جاري البحث عنك واستخراج إحصائياتك...")
-    for item in message.attachments:
-      if any(
-          item.filename.lower().endswith(ext)
-          for ext in [".png", ".jpg", ".jpeg", ".webp"]
+    for attachment in message.attachments:
+      # التحقق أن المرفق صورة
+      if attachment.filename.lower().endswith(
+          (".png", ".jpg", ".jpeg", ".webp")
       ):
-        try:
-          img_bytes = await item.read()
-          img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+        await message.channel.send(
+            "...تم استلام الصورة، جاري البحث عنك واستخراج إحصائياتك"
+        )
 
-          # تم تعديل اسم النموذج هنا ليكون مدعوماً وصحيحاً
-          url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_GEMINI}"
+        try:
+          # تحميل الصورة كبايتات
+          image_response = requests.get(attachment.url)
+          if image_response.status_code != 200:
+            await message.channel.send("فشل في تحميل الصورة المرفقة.")
+            return
+
+          import base64
+
+          image_bytes = image_response.content
+          image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+          # استخدام إصدار v1 المستقر للاتصال بـ Gemini
+          url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY_GEMINI}"
 
           headers = {"Content-Type": "application/json"}
+
           payload = {
               "contents": [{
                   "parts": [
                       {
                           "text": (
-                              'Look at the image of the One Piece: Bounty Rush'
-                              ' match results. 1. Find the row marked with'
-                              ' "You" (the player indicator). 2. Extract their'
-                              ' KOs, Captures, and Battle Score from that'
-                              ' specific row. 3. Reply with a fun, enthusiastic'
-                              ' message in Arabic like: "عاشت ايدك!'
-                              ' إحصائياتك مجنونة: حصلت على [KOs] قتلات و'
-                              ' [Captures] كابتشر وسكور [Score]! كفو!" If you'
-                              ' cannot find the "You" row, just say: "ما قدرت'
-                              ' أحدد إحصائياتك، ممكن صورة أوضح؟"'
+                              "قم بتحليل صورة إحصائيات لعبة One Piece: Bounty"
+                              " Rush واستخرج منها النتائج والقتل والأموال"
+                              " وغيرها بشكل منظم."
                           )
                       },
                       {
                           "inline_data": {
                               "mime_type": "image/jpeg",
-                              "data": img_b64,
+                              "data": image_b64,
                           }
                       },
                   ]
               }]
           }
 
-          response = requests.post(url, headers=headers, json=payload)
+          response = requests.post(url, json=payload, headers=headers)
           result = response.json()
 
+          # استخراج الرد من نموذج جيمني
           if "candidates" in result:
-            answer = (
-                result["candidates"][0]["content"]["parts"][0]["text"]
-                .strip()
-            )
-            await message.reply(answer)
+            analysis_text = result["candidates"][0]["content"]["parts"][0][
+                "text"
+            ]
+            await message.channel.send(analysis_text)
           else:
+            # طباعة الخطأ القادم من واجهة برمجة التطبيقات إن وُجد
             error_msg = result.get("error", {}).get(
-                "message", "خطأ غير معروف"
+                "message", "خطأ غير معروف في الاستجابة"
             )
-            await message.reply(f"تعذر التحليل: {error_msg}")
+            await message.channel.send(f"تعذر التحليل: {error_msg}")
 
         except Exception as e:
-          print(f"خطأ برمجي: {e}")
+          await message.channel.send(f"حدث خطأ أثناء المعالجة: {e}")
 
 
-if TOKEN_DISCORD:
-  bot_client.run(TOKEN_DISCORD)
-else:
-  print("Error: DISCORD_TOKEN is not set in environment variables!")
+# تشغيل البوت
+client.run(TOKEN)
