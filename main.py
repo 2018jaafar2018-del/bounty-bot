@@ -1,6 +1,7 @@
 import os
 import discord
 import requests
+import base64
 
 # قراءة التوكن والمفتاح من متغيرات البيئة في Railway
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -40,15 +41,16 @@ async def on_message(message):
             await message.channel.send("فشل في تحميل الصورة المرفقة.")
             return
 
-          import base64
-
           image_bytes = image_response.content
           image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-          # استخدام إصدار v1 المستقر للاتصال بـ Gemini
-          url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY_GEMINI}"
+          # استخدام الرابط الصحيح وتمرير المفتاح في الـ Headers
+          url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
-          headers = {"Content-Type": "application/json"}
+          headers = {
+              "Content-Type": "application/json",
+              "x-goog-api-key": API_KEY_GEMINI
+          }
 
           payload = {
               "contents": [{
